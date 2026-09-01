@@ -27,6 +27,11 @@ jobs:
         flutter-version: 'stable'
         cache: true
 
+    - name: Print Flutter and Dart versions
+      run: |
+        flutter --version
+        dart --version
+
     - name: Install dependencies
       run: flutter pub get
 
@@ -38,9 +43,23 @@ jobs:
         echo "org.gradle.workers.max=4" >> android/gradle.properties
         echo "org.gradle.daemon=true" >> android/gradle.properties
         echo "org.gradle.jvmargs=-Xmx2048m" >> android/gradle.properties
+        cat android/gradle.properties
 
-    - name: Build Debug APK with verbose output
-      run: flutter build apk --debug --verbose
+    - name: Clean build
+      run: flutter clean
+
+    - name: Build Debug APK - Verbose with full output
+      run: flutter build apk --debug --verbose 2>&1 | tee build-output.log
+      continue-on-error: true
+
+    - name: Display full build log on failure
+      if: failure()
+      run: |
+        echo "=== FULL BUILD LOG ==="
+        cat build-output.log
+        echo ""
+        echo "=== Checking for error files ==="
+        find . -name "*.log" -type f 2>/dev/null | head -20
 
     - name: List build outputs
       run: |
@@ -48,11 +67,9 @@ jobs:
         if [ -d "build/app/outputs/flutter-apk/" ]; then
           ls -lah build/app/outputs/flutter-apk/
         else
-          echo "No flutter-apk directory found"
+          echo "ERROR: No flutter-apk directory found"
+          find build -name "*.apk" 2>/dev/null || echo "No APK files found anywhere"
         fi
-        
-        echo "=== Checking build directory ==="
-        ls -lah build/app/outputs/ 2>/dev/null || echo "No outputs directory"
 
     - name: Upload Debug APK Artifact
       uses: actions/upload-artifact@v4
