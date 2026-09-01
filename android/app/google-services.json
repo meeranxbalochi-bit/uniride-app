@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "757229807744",
+    "project_id": "gen-lang-client-0559318477",
+    "storage_bucket": "gen-lang-client-0559318477.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:757229807744:android:50e4c56015c1beb87a5e65",
+        "android_client_info": {
+          "package_name": "com.university.uniride_app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "757229807744-9p8uejj4oafstjqklq695hontmamqbg2.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBnUBWuaLAQJFejEwwepRmofFG_wxvtcfM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "757229807744-9p8uejj4oafstjqklq695hontmamqbg2.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
