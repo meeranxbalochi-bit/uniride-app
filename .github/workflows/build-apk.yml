@@ -30,11 +30,33 @@ jobs:
     - name: Install dependencies
       run: flutter pub get
 
-    - name: Build Debug APK
-      run: flutter build apk --debug
+    - name: Configure Gradle for Android build
+      run: |
+        echo "kotlin.incremental=false" >> android/gradle.properties
+        echo "kotlin.incremental.multiplatform=false" >> android/gradle.properties
+        echo "org.gradle.parallel=true" >> android/gradle.properties
+        echo "org.gradle.workers.max=4" >> android/gradle.properties
+        echo "org.gradle.daemon=true" >> android/gradle.properties
+        echo "org.gradle.jvmargs=-Xmx2048m" >> android/gradle.properties
+
+    - name: Build Debug APK with verbose output
+      run: flutter build apk --debug --verbose
+
+    - name: List build outputs
+      run: |
+        echo "=== Checking build outputs ==="
+        if [ -d "build/app/outputs/flutter-apk/" ]; then
+          ls -lah build/app/outputs/flutter-apk/
+        else
+          echo "No flutter-apk directory found"
+        fi
+        
+        echo "=== Checking build directory ==="
+        ls -lah build/app/outputs/ 2>/dev/null || echo "No outputs directory"
 
     - name: Upload Debug APK Artifact
       uses: actions/upload-artifact@v4
+      if: hashFiles('build/app/outputs/flutter-apk/app-debug.apk') != ''
       with:
         name: debug-apk
         path: build/app/outputs/flutter-apk/app-debug.apk
