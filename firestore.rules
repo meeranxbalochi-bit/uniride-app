@@ -4,15 +4,24 @@ service cloud.firestore {
     
     // ────────────────────────────────────────────────────────────────
     // USERS COLLECTION
-    // Each user can read/write only their own profile
+    // Users can create their own profile (on first login)
+    // Users can read/update only their own profile
+    // Admins can update any user
     // ────────────────────────────────────────────────────────────────
     match /users/{uid} {
+      // Allow creating own profile (first time login)
+      allow create: if request.auth != null && request.auth.uid == uid;
+      
+      // Allow reading own profile
       allow read: if request.auth != null && request.auth.uid == uid;
-      allow write: if request.auth != null && request.auth.uid == uid;
-      allow create: if request.auth != null;
+      
+      // Allow updating own profile OR admin updating anyone
       allow update: if request.auth != null && 
                       (request.auth.uid == uid || 
                        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role') == 'admin');
+      
+      // No deletes
+      allow delete: if false;
     }
     
     // ────────────────────────────────────────────────────────────────
