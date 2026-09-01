@@ -1,18 +1,20 @@
+import 'dart:math';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 
 /// Provides satellite map tile layer using USGS Satellite imagery via Flutter Map (Leaflet).
-/// 
+///
 /// This replaces Google Maps with an open-source Leaflet-based satellite map solution.
 class MapService {
   MapService._();
 
   /// Returns the satellite map tile layer for Flutter Map.
-  /// 
+  ///
   /// Uses USGS imagery which provides worldwide satellite/aerial coverage.
   static TileLayer getSatelliteTileLayer() {
     return TileLayer(
-      urlTemplate: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+      urlTemplate:
+          'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
       userAgentPackageName: 'com.uniride.transit',
       // Fallback to OpenStreetMap if USGS is unavailable
       fallbackUrl: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
@@ -41,14 +43,12 @@ class MapService {
     final dLat = _degreesToRadians(to.latitude - from.latitude);
     final dLng = _degreesToRadians(to.longitude - from.longitude);
 
-    final a = (1 - (2 * dLat / (2 * 3.14159265359)).cos()) / 2 +
-        (2 * lat1Rad / (2 * 3.14159265359)).cos() *
-            (2 * lat2Rad / (2 * 3.14159265359)).cos() *
-            (1 - (2 * dLng / (2 * 3.14159265359)).cos()) /
-            2;
+    final a = sin(dLat / 2) * sin(dLat / 2) +
+        cos(lat1Rad) * cos(lat2Rad) * sin(dLng / 2) * sin(dLng / 2);
+    final c = 2 * asin(sqrt(a));
 
-    return earthRadiusM * 2 * (a.isNaN ? 0 : a.asin().abs());
+    return earthRadiusM * c;
   }
 
-  static double _degreesToRadians(double degrees) => degrees * (3.14159265359 / 180);
+  static double _degreesToRadians(double degrees) => degrees * pi / 180;
 }
