@@ -20,6 +20,11 @@ jobs:
       with:
         distribution: 'temurin'
         java-version: '11'
+        
+    - name: Verify Java installation
+      run: |
+        java -version
+        javac -version
 
     - name: Setup Flutter
       uses: subosito/flutter-action@v2
@@ -29,47 +34,75 @@ jobs:
 
     - name: Print Flutter and Dart versions
       run: |
+        echo "=== Flutter Version ==="
         flutter --version
+        echo ""
+        echo "=== Dart Version ==="
         dart --version
 
     - name: Install dependencies
-      run: flutter pub get
+      run: |
+        echo "Getting pub dependencies..."
+        flutter pub get
+        echo "Success!"
+
+    - name: Check project structure
+      run: |
+        echo "=== Project Structure ==="
+        ls -la
+        echo ""
+        echo "=== Android Directory ==="
+        ls -la android/
+        echo ""
+        echo "=== Lib Directory ==="
+        ls -la lib/
 
     - name: Configure Gradle for Android build
       run: |
+        echo "=== Configuring Gradle ==="
+        cat android/gradle.properties
+        echo ""
         echo "kotlin.incremental=false" >> android/gradle.properties
         echo "kotlin.incremental.multiplatform=false" >> android/gradle.properties
         echo "org.gradle.parallel=true" >> android/gradle.properties
         echo "org.gradle.workers.max=4" >> android/gradle.properties
         echo "org.gradle.daemon=true" >> android/gradle.properties
         echo "org.gradle.jvmargs=-Xmx2048m" >> android/gradle.properties
+        echo ""
+        echo "=== Updated gradle.properties ==="
         cat android/gradle.properties
 
+    - name: Analyze code
+      run: flutter analyze || true
+
     - name: Clean build
-      run: flutter clean
-
-    - name: Build Debug APK - Verbose with full output
-      run: flutter build apk --debug --verbose 2>&1 | tee build-output.log
-      continue-on-error: true
-
-    - name: Display full build log on failure
-      if: failure()
       run: |
-        echo "=== FULL BUILD LOG ==="
-        cat build-output.log
-        echo ""
-        echo "=== Checking for error files ==="
-        find . -name "*.log" -type f 2>/dev/null | head -20
+        echo "Cleaning build..."
+        flutter clean
+        echo "Clean complete!"
+
+    - name: Build Debug APK
+      run: |
+        echo "Starting Flutter build..."
+        set -x
+        flutter build apk --debug --verbose
+        set +x
+        echo "Build completed!"
+      shell: bash
+      continue-on-error: false
 
     - name: List build outputs
+      if: always()
       run: |
-        echo "=== Checking build outputs ==="
-        if [ -d "build/app/outputs/flutter-apk/" ]; then
-          ls -lah build/app/outputs/flutter-apk/
-        else
-          echo "ERROR: No flutter-apk directory found"
-          find build -name "*.apk" 2>/dev/null || echo "No APK files found anywhere"
-        fi
+        echo "=== Build Output Directory Structure ==="
+        find build -type f -name "*.apk" 2>/dev/null || echo "No APK files found"
+        echo ""
+        echo "=== Full build directory ==="
+        ls -lah build/ 2>/dev/null || echo "Build directory not found"
+        echo ""
+        ls -lah build/app/ 2>/dev/null || echo "build/app not found"
+        echo ""
+        ls -lah build/app/outputs/ 2>/dev/null || echo "build/app/outputs not found"
 
     - name: Upload Debug APK Artifact
       uses: actions/upload-artifact@v4
