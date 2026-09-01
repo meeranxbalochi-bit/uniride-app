@@ -12,7 +12,8 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4
+    - name: Checkout code
+      uses: actions/checkout@v4
 
     - name: Setup Java
       uses: actions/setup-java@v5
@@ -26,37 +27,59 @@ jobs:
         flutter-version: 'stable'
         cache: true
 
-    - name: Get dependencies
+    - name: Get Flutter dependencies
       run: flutter pub get
 
-    - name: Analyze
+    - name: Analyze code
       run: flutter analyze || true
 
-    - name: Build APK (Debug)
-      run: flutter build apk --debug
+    - name: Build Debug APK
+      run: |
+        echo "Starting Debug Build..."
+        flutter build apk --debug
+        echo "Debug Build Complete"
+
+    - name: List debug artifacts
+      run: ls -la build/app/outputs/flutter-apk/ || echo "No debug artifacts found"
 
     - name: Upload Debug APK
       uses: actions/upload-artifact@v4
+      if: success()
       with:
-        name: app-debug
+        name: app-debug-apk
         path: build/app/outputs/flutter-apk/app-debug.apk
-        if-no-files-found: warn
+        retention-days: 30
 
-    - name: Configure Gradle for Release Build
+    - name: Configure Gradle optimizations
       run: |
         echo "kotlin.incremental=false" >> android/gradle.properties
         echo "kotlin.incremental.multiplatform=false" >> android/gradle.properties
         echo "org.gradle.parallel=true" >> android/gradle.properties
         echo "org.gradle.workers.max=4" >> android/gradle.properties
+        echo "org.gradle.daemon=true" >> android/gradle.properties
 
-    - name: Build APK (Release)
-      run: flutter build apk --release
+    - name: Build Release APK
+      run: |
+        echo "Starting Release Build..."
+        flutter build apk --release
+        echo "Release Build Complete"
+      timeout-minutes: 45
       continue-on-error: true
 
-    - name: Upload Release APK
+    - name: List release artifacts
+      run: ls -la build/app/outputs/flutter-apk/ || echo "No release artifacts found"
+
+    - name: Upload Release APK if exists
       uses: actions/upload-artifact@v4
-      if: always()
+      if: hashFiles('build/app/outputs/flutter-apk/app-release.apk') != ''
       with:
-        name: app-release
+        name: app-release-apk
         path: build/app/outputs/flutter-apk/app-release.apk
-        if-no-files-found: warn
+        retention-days: 30
+
+    - name: Build Summary
+      run: |
+        echo "=== Build Summary ==="
+        echo "Debug APK: $([ -f build/app/outputs/flutter-apk/app-debug.apk ] && echo 'SUCCESS' || echo 'FAILED')"
+        echo "Release APK: $([ -f build/app/outputs/flutter-apk/app-release.apk ] && echo 'SUCCESS' || echo 'FAILED')"
+        ls -lh build/app/outputs/flutter-apk/*.apk 2>/dev/null || echo "No APKs found"
