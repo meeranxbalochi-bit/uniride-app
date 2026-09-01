@@ -20,7 +20,7 @@ android {
     }
 
     kotlinOptions {
-        jvmTarget = JavaVersion.VERSION_17.toString()
+        jvmTarget = "17"
     }
 
     defaultConfig {
@@ -39,10 +39,6 @@ android {
             // Sign release builds with debug keys temporarily for testing
             // TODO: Create proper release keystore for production
             signingConfig = signingConfigs.getByName("debug")
-        }
-        debug {
-            // Debug build uses default debug signing from ~/.android/debug.keystore
-            debuggable = true
         }
     }
 }
