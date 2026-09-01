@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/theme/app_colors.dart';
@@ -9,9 +10,10 @@ import '../../providers/auth_providers.dart';
 import '../../providers/bus_providers.dart';
 import '../../services/proximity_radar_service.dart';
 import '../../services/firestore_service.dart';
+import '../../services/map_service.dart';
 import '../../shared/widgets/glass_card.dart';
 
-/// Student live tracking dashboard with Google Maps and QR scanner.
+/// Student live tracking dashboard with Leaflet Satellite Map and QR scanner.
 class StudentDashboardScreen extends ConsumerStatefulWidget {
   const StudentDashboardScreen({super.key});
 
@@ -22,8 +24,14 @@ class StudentDashboardScreen extends ConsumerStatefulWidget {
 
 class _StudentDashboardScreenState
     extends ConsumerState<StudentDashboardScreen> {
-  GoogleMapController? _mapController;
+  late MapController _mapController;
   final ProximityRadarService _radar = ProximityRadarService();
+
+  @override
+  void initState() {
+    super.initState();
+    _mapController = MapController();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -42,8 +50,7 @@ class _StudentDashboardScreenState
                 gradient: AppColors.accentGradient,
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: const Icon(Icons.gps_fixed,
-                  color: Colors.white, size: 20),
+              child: const Icon(Icons.gps_fixed, color: Colors.white, size: 20),
             ),
             const SizedBox(width: 12),
             const Text('Live Tracker'),
@@ -105,47 +112,136 @@ class _StudentDashboardScreenState
 
           return Stack(
             children: [
-              // Google Map
-              GoogleMap(
-                initialCameraPosition: CameraPosition(
-                  target: LatLng(
-                    trackedBus.currentLocation?.lat ??
-                        AppConstants.defaultLat,
-                    trackedBus.currentLocation?.lng ??
-                        AppConstants.defaultLng,
+              // Leaflet Satellite Map
+              FlutterMap(
+                mapController: _mapController,
+                options: MapOptions(
+                  initialCenter: LatLng(
+                    trackedBus.currentLocation?.lat ?? AppConstants.defaultLat,
+                    trackedBus.currentLocation?.lng ?? AppConstants.defaultLng,
                   ),
-                  zoom: 15.5,
+                  initialZoom: 15.5,
+                  interactionOptions: const InteractionOptions(
+                    flags: InteractiveFlag.all,
+                  ),
                 ),
-                onMapCreated: (controller) => _mapController = controller,
-                myLocationEnabled: true,
-                myLocationButtonEnabled: false,
-                zoomControlsEnabled: false,
-                mapToolbarEnabled: false,
-                markers: {
+                children: [
+                  // Satellite tile layer (USGS imagery)
+                  MapService.getSatelliteTileLayer(),
+                  // Bus marker
                   if (trackedBus.currentLocation != null)
-                    Marker(
-                      markerId: MarkerId(trackedBus.id),
-                      position: LatLng(
-                        trackedBus.currentLocation!.lat,
-                        trackedBus.currentLocation!.lng,
-                      ),
-                      infoWindow: InfoWindow(
-                        title: trackedBus.busNumber,
-                        snippet:
-                            '${trackedBus.routeName} • ${trackedBus.currentLocation!.speed.toStringAsFixed(0)} km/h',
-                      ),
+                    MarkerLayer(
+                      markers: [
+                        Marker(
+                          point: LatLng(
+                            trackedBus.currentLocation!.lat,
+                            trackedBus.currentLocation!.lng,
+                          ),
+                          width: 50,
+                          height: 50,
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                decoration: BoxDecoration(
+                                  color: AppColors.accent,
+                                  shape: BoxShape.circle,
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: AppColors.accent
+                                          .withValues(alpha: 0.5),
+                                      blurRadius: 8,
+                                      offset: const Offset(0, 4),
+                                    ),
+                                  ],
+                                ),
+                                padding: const EdgeInsets.all(8),
+                                child: const Icon(
+                                  Icons.directions_bus,
+                                  color: Colors.white,
+                                  size: 24,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.black87,
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  trackedBus.busNumber,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
                   // Stop markers
-                  ...trackedBus.stops.map(
-                    (stop) => Marker(
-                      markerId: MarkerId('stop_${stop.id}'),
-                      position: LatLng(stop.lat, stop.lng),
-                      icon: BitmapDescriptor.defaultMarkerWithHue(
-                          BitmapDescriptor.hueAzure),
-                      infoWindow: InfoWindow(title: stop.name),
-                    ),
+                  MarkerLayer(
+                    markers: trackedBus.stops.map((stop) {
+                      return Marker(
+                        point: LatLng(stop.lat, stop.lng),
+                        width: 40,
+                        height: 40,
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              decoration: BoxDecoration(
+                                color: Colors.blue,
+                                shape: BoxShape.circle,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.blue.withValues(alpha: 0.5),
+                                    blurRadius: 8,
+                                  ),
+                                ],
+                              ),
+                              padding: const EdgeInsets.all(5),
+                              child: const Icon(
+                                Icons.location_on_outlined,
+                                color: Colors.white,
+                                size: 18,
+                              ),
+                            ),
+                            const SizedBox(height: 3),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 4,
+                                vertical: 1,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.blue.shade900,
+                                borderRadius: BorderRadius.circular(3),
+                              ),
+                              child: Text(
+                                stop.name.length > 12
+                                    ? '${stop.name.substring(0, 12)}...'
+                                    : stop.name,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }).toList(),
                   ),
-                },
+                ],
               ),
 
               // Recenter FAB
@@ -155,18 +251,17 @@ class _StudentDashboardScreenState
                   bottom: 180,
                   child: FloatingActionButton.small(
                     onPressed: () {
-                      _mapController?.animateCamera(
-                        CameraUpdate.newLatLng(
-                          LatLng(
-                            trackedBus!.currentLocation!.lat,
-                            trackedBus.currentLocation!.lng,
-                          ),
+                      _mapController.move(
+                        LatLng(
+                          trackedBus!.currentLocation!.lat,
+                          trackedBus.currentLocation!.lng,
                         ),
+                        15.5,
                       );
                     },
                     backgroundColor: AppColors.surface,
-                    child: const Icon(Icons.my_location,
-                        color: AppColors.primary),
+                    child:
+                        const Icon(Icons.my_location, color: AppColors.primary),
                   ),
                 ),
 
@@ -186,22 +281,20 @@ class _StudentDashboardScreenState
                             width: 44,
                             height: 44,
                             decoration: BoxDecoration(
-                              color: AppColors
-                                  .busStatusColor(trackedBus.status)
+                              color: AppColors.busStatusColor(trackedBus.status)
                                   .withValues(alpha: 0.15),
                               borderRadius: BorderRadius.circular(14),
                             ),
                             child: Icon(
                               Icons.directions_bus,
-                              color: AppColors.busStatusColor(
-                                  trackedBus.status),
+                              color:
+                                  AppColors.busStatusColor(trackedBus.status),
                             ),
                           ),
                           const SizedBox(width: 14),
                           Expanded(
                             child: Column(
-                              crossAxisAlignment:
-                                  CrossAxisAlignment.start,
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
                                   trackedBus.busName.isNotEmpty
@@ -229,8 +322,7 @@ class _StudentDashboardScreenState
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 14, vertical: 8),
                             decoration: BoxDecoration(
-                              color:
-                                  AppColors.accent.withValues(alpha: 0.15),
+                              color: AppColors.accent.withValues(alpha: 0.15),
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: Text(
@@ -247,8 +339,7 @@ class _StudentDashboardScreenState
                       if (trackedBus.currentLocation != null) ...[
                         const SizedBox(height: 14),
                         Row(
-                          mainAxisAlignment:
-                              MainAxisAlignment.spaceAround,
+                          mainAxisAlignment: MainAxisAlignment.spaceAround,
                           children: [
                             _MiniStat(
                               icon: Icons.speed,
@@ -265,8 +356,8 @@ class _StudentDashboardScreenState
                               value: trackedBus.status
                                   .replaceAll('_', ' ')
                                   .toUpperCase(),
-                              color: AppColors.busStatusColor(
-                                  trackedBus.status),
+                              color:
+                                  AppColors.busStatusColor(trackedBus.status),
                             ),
                           ],
                         ),
@@ -408,8 +499,8 @@ class _StudentDashboardScreenState
                   ),
                   const SizedBox(width: 12),
                   ElevatedButton(
-                    onPressed: () => _joinByFleetCode(
-                        fleetCodeController.text, context),
+                    onPressed: () =>
+                        _joinByFleetCode(fleetCodeController.text, context),
                     child: const Text('Join'),
                   ),
                 ],
@@ -426,8 +517,7 @@ class _StudentDashboardScreenState
     for (final barcode in capture.barcodes) {
       if (barcode.rawValue != null) {
         final raw = barcode.rawValue!;
-        final code =
-            raw.replaceAll(AppConstants.qrDeepLinkPrefix, '');
+        final code = raw.replaceAll(AppConstants.qrDeepLinkPrefix, '');
         await _joinByFleetCode(code, context);
         break;
       }

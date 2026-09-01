@@ -35,13 +35,18 @@ class AuthService extends ChangeNotifier {
       _user = firebaseUser;
       if (firebaseUser != null) {
         try {
+          debugPrint(
+              '[Auth] Auth state changed - user logged in: ${firebaseUser.email}');
           _profile = await _processUserProfile(firebaseUser);
           _error = null;
+          debugPrint('[Auth] Auth state listener: profile loaded successfully');
         } catch (e) {
-          debugPrint('Error processing user profile: $e');
+          debugPrint(
+              '[Auth] Auth state listener - Error processing user profile: $e');
           _error = 'Failed to load profile. Please try again.';
         }
       } else {
+        debugPrint('[Auth] Auth state changed - user logged out');
         _profile = null;
         _error = null;
       }
@@ -59,37 +64,52 @@ class AuthService extends ChangeNotifier {
     final isTargetAdmin =
         email == AppConstants.superAdminEmail.toLowerCase().trim();
 
-    final userDoc = await FirestoreService.usersRef
-        .doc(firebaseUser.uid)
-        .get();
+    debugPrint('[Profile] Loading profile for email: $email');
 
-    if (!userDoc.exists) {
-      // ── New user: auto-provision ──
-      final newProfile = UserProfile(
-        uid: firebaseUser.uid,
-        email: firebaseUser.email ?? '',
-        displayName: firebaseUser.displayName ??
-            (isTargetAdmin ? 'Super Admin' : 'Campus User'),
-        photoURL: firebaseUser.photoURL,
-        role: isTargetAdmin ? 'admin' : 'student',
-        createdAt: DateTime.now().millisecondsSinceEpoch,
-      );
+    try {
+      final userDoc =
+          await FirestoreService.usersRef.doc(firebaseUser.uid).get();
 
-      await FirestoreService.usersRef
-          .doc(firebaseUser.uid)
-          .set(newProfile.toMap());
-      return newProfile;
-    } else {
-      // ── Existing user: load and optionally elevate ──
-      var existing =
-          UserProfile.fromMap(firebaseUser.uid, userDoc.data()!);
-      if (isTargetAdmin && existing.role != 'admin') {
-        existing = existing.copyWith(role: 'admin');
+      if (!userDoc.exists) {
+        // ── New user: auto-provision ──
+        debugPrint(
+            '[Profile] New user detected, creating profile with role: ${isTargetAdmin ? 'admin' : 'student'}');
+        final newProfile = UserProfile(
+          uid: firebaseUser.uid,
+          email: firebaseUser.email ?? '',
+          displayName: firebaseUser.displayName ??
+              (isTargetAdmin ? 'Super Admin' : 'Campus User'),
+          photoURL: firebaseUser.photoURL,
+          role: isTargetAdmin ? 'admin' : 'student',
+          createdAt: DateTime.now().millisecondsSinceEpoch,
+        );
+
+        debugPrint('[Profile] Writing profile to Firestore...');
         await FirestoreService.usersRef
             .doc(firebaseUser.uid)
-            .update({'role': 'admin'});
+            .set(newProfile.toMap());
+        debugPrint('[Profile] Profile created successfully');
+        return newProfile;
+      } else {
+        // ── Existing user: load and optionally elevate ──
+        debugPrint('[Profile] Existing user found, loading profile');
+        var existing = UserProfile.fromMap(firebaseUser.uid, userDoc.data()!);
+        if (isTargetAdmin && existing.role != 'admin') {
+          debugPrint('[Profile] Elevating existing user to admin');
+          existing = existing.copyWith(role: 'admin');
+          await FirestoreService.usersRef
+              .doc(firebaseUser.uid)
+              .update({'role': 'admin'});
+        }
+        debugPrint('[Profile] Profile loaded successfully');
+        return existing;
       }
-      return existing;
+    } on FirebaseException catch (e) {
+      debugPrint('[Profile] Firestore Error: ${e.code} - ${e.message}');
+      rethrow;
+    } catch (e) {
+      debugPrint('[Profile] Unexpected profile error: $e');
+      rethrow;
     }
   }
 
@@ -108,20 +128,37 @@ class AuthService extends ChangeNotifier {
         return;
       }
 
+      debugPrint('[Auth] Google Sign-In successful: ${googleUser.email}');
+
       final GoogleSignInAuthentication googleAuth =
           await googleUser.authentication;
+      debugPrint('[Auth] OAuth token obtained');
+
       final OAuthCredential credential = GoogleAuthProvider.credential(
         accessToken: googleAuth.accessToken,
         idToken: googleAuth.idToken,
       );
 
+      debugPrint('[Auth] Firebase credential created, signing in...');
       final UserCredential userCredential =
           await _auth.signInWithCredential(credential);
+      debugPrint(
+          '[Auth] Firebase auth succeeded for UID: ${userCredential.user?.uid}');
+
       if (userCredential.user != null) {
+        debugPrint('[Auth] Processing user profile for Firestore...');
         _profile = await _processUserProfile(userCredential.user!);
+        debugPrint('[Auth] Profile processing complete');
       }
+    } on FirebaseAuthException catch (e) {
+      debugPrint('[Auth] Firebase Auth Error: ${e.code} - ${e.message}');
+      _error = 'Firebase auth failed: ${e.code} (${e.message})';
+    } on FirebaseException catch (e) {
+      debugPrint(
+          '[Auth] Firebase Error (likely Firestore): ${e.code} - ${e.message}');
+      _error = 'Firestore error: ${e.code} (${e.message})';
     } catch (e) {
-      debugPrint('Google SSO Error: $e');
+      debugPrint('[Auth] Unexpected error: $e');
       _error = 'Sign-in failed. Please check your connection and try again.';
     } finally {
       _isLoading = false;

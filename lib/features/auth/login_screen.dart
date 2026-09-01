@@ -73,7 +73,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 28),
           child: SizedBox(
-            height: size.height - MediaQuery.of(context).padding.top - MediaQuery.of(context).padding.bottom,
+            height: size.height -
+                MediaQuery.of(context).padding.top -
+                MediaQuery.of(context).padding.bottom,
             child: Column(
               children: [
                 const Spacer(flex: 2),
@@ -215,15 +217,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                 // ─── Features row ───────────────────────────
                 FadeTransition(
                   opacity: _fadeAnimation,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      _featureChip(Icons.gps_fixed, 'Live GPS'),
-                      const SizedBox(width: 12),
-                      _featureChip(Icons.qr_code_scanner, 'QR Scan'),
-                      const SizedBox(width: 12),
-                      _featureChip(Icons.notifications_active, 'Alerts'),
-                    ],
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        _featureChip(Icons.gps_fixed, 'Live GPS'),
+                        const SizedBox(width: 12),
+                        _featureChip(Icons.qr_code_scanner, 'QR Scan'),
+                        const SizedBox(width: 12),
+                        _featureChip(Icons.notifications_active, 'Alerts'),
+                      ],
+                    ),
                   ),
                 ),
 
